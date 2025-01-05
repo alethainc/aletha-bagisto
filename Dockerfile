@@ -41,36 +41,26 @@ RUN a2enmod rewrite
 # setting work directory
 WORKDIR /var/www/html
 
-# adding user and setting up permissions
-RUN useradd -G www-data,root -u 1000 -d /home/bagisto bagisto && \
-    mkdir -p /home/bagisto/.composer && \
-    chown -R bagisto:bagisto /home/bagisto
-
-# Create base storage directory
-RUN mkdir -p /var/www/html/storage && \
-    mkdir -p /var/www/html/bootstrap/cache && \
-    chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache && \
-    chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Create base directories and set permissions
+RUN mkdir -p storage/framework/{sessions,views,cache} \
+    && mkdir -p storage/logs \
+    && mkdir -p bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
 # Copy application code
 COPY . /var/www/html
 
 # Set permissions for application files
-RUN chown -R bagisto:www-data /var/www/html && \
-    find /var/www/html -type f -exec chmod 664 {} \; && \
-    find /var/www/html -type d -exec chmod 775 {} \;
-
-# Switch to bagisto user for composer operations
-USER bagisto
+RUN chown -R www-data:www-data /var/www/html \
+    && find /var/www/html -type f -exec chmod 664 {} \; \
+    && find /var/www/html -type d -exec chmod 775 {} \;
 
 # Install dependencies
 RUN composer update league/flysystem-aws-s3-v3 --with-dependencies && \
     composer require bagisto/graphql-api && \
     composer require mll-lab/laravel-graphql-playground && \
     composer install --no-dev --optimize-autoloader
-
-# Switch back to root for final operations
-USER root
 
 # Clear all caches and create storage link
 RUN php artisan config:clear && \
