@@ -10,3 +10,15 @@
 | contains the "web" middleware group. Now create something great!
 |
 */
+
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
+use App\Http\Controllers\HealthController;
+
+Route::get('/health', [HealthController::class, 'check']);
+
+Route::get('/health-check', function () {
+    return response()->json(['status' => 'ok'], 200);
+});
