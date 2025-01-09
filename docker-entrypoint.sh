@@ -29,10 +29,17 @@ echo "Setting permissions..."
 chown -R www-data:www-data storage bootstrap/cache public/media public/storage
 chmod -R 775 storage bootstrap/cache public/media public/storage
 
-# Create a simple health check file
+# Create health check directory and file
 echo "Creating health check..."
-cat > public/health.txt << 'EOF'
-OK
+mkdir -p public/health
+echo "OK" > public/health/index.html
+
+# Create specific .htaccess for health check
+cat > public/health/.htaccess << 'EOF'
+# Disable all rewrite rules for health check
+<IfModule mod_rewrite.c>
+    RewriteEngine Off
+</IfModule>
 EOF
 
 # Start Apache in foreground
