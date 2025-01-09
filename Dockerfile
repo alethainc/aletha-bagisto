@@ -50,7 +50,7 @@ RUN chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type d -exec chmod 775 {} \;
 
 # Install dependencies
-RUN composer update league/flysystem-aws-s3-v3 --with-dependencies && \
+RUN composer require league/flysystem-aws-s3-v3:"^3.0" --with-all-dependencies && \
     composer require bagisto/graphql-api && \
     composer require mll-lab/laravel-graphql-playground && \
     composer install --no-dev --optimize-autoloader
