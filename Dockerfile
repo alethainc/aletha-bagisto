@@ -41,13 +41,6 @@ RUN a2enmod rewrite
 # setting work directory
 WORKDIR /var/www/html
 
-# Create base directories and set permissions
-RUN mkdir -p storage/framework/{sessions,views,cache} \
-    && mkdir -p storage/logs \
-    && mkdir -p bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
-
 # Copy application code
 COPY . /var/www/html
 
@@ -61,15 +54,6 @@ RUN composer update league/flysystem-aws-s3-v3 --with-dependencies && \
     composer require bagisto/graphql-api && \
     composer require mll-lab/laravel-graphql-playground && \
     composer install --no-dev --optimize-autoloader
-
-# Clear all caches and create storage link
-RUN php artisan config:clear && \
-    php artisan cache:clear && \
-    php artisan view:clear && \
-    php artisan route:clear && \
-    php artisan optimize:clear && \
-    rm -f public/storage && \
-    php artisan storage:link
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/

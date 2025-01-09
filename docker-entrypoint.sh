@@ -3,42 +3,24 @@ set -e
 
 cd /var/www/html
 
-echo "Creating required directories and files..."
-mkdir -p storage/framework/{sessions,views,cache}
-mkdir -p storage/logs
+# Only ensure critical directories exist
+echo "Checking critical directories..."
+mkdir -p storage
 mkdir -p bootstrap/cache
-touch storage/logs/laravel.log
 
-echo "Setting proper permissions..."
-chown -R www-data:www-data storage
-chown -R www-data:www-data bootstrap/cache
-chmod -R 775 storage
-chmod -R 775 bootstrap/cache
+# Set base permissions
+echo "Setting base permissions..."
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
 
-echo "Running database migrations and seeds..."
-php artisan migrate --force
-php artisan db:seed --force
-
-echo "Publishing vendor assets..."
-php artisan vendor:publish --all --force
-php artisan bagisto:publish --force
-
-echo "Creating installation marker..."
-touch storage/installed
-chmod 775 storage/installed
-chown www-data:www-data storage/installed
-
-echo "Clearing all caches..."
-php artisan optimize:clear
-php artisan config:clear
-php artisan cache:clear
-php artisan view:clear
-php artisan route:clear
-
+# Optimize application
 echo "Optimizing application..."
+php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+php artisan event:cache
 
+# Start Apache
 echo "Starting Apache..."
 apache2-foreground
