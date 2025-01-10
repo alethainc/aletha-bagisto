@@ -4,10 +4,6 @@ on:
   push:
     branches: [ main ]
 
-env:
-  EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-  ENVIRONMENT: dev
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -39,13 +35,10 @@ jobs:
         
         # Get branch name
         BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//-/g')
-        # Get commit message
-        COMMIT_MSG=$(git log -1 --pretty=%B)
         
         echo "::set-output name=version::${VERSION}"
         echo "::set-output name=short_sha::${SHORT_SHA}"
         echo "::set-output name=branch::${BRANCH_NAME}"
-        echo "::set-output name=commit_msg::${COMMIT_MSG}"
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
@@ -68,7 +61,6 @@ jobs:
         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         VERSION: ${{ steps.meta.outputs.version }}
         SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
-        BRANCH: ${{ steps.meta.outputs.branch }}
       run: |
         # Build using buildx with platform specification
         docker buildx build \
@@ -86,46 +78,6 @@ jobs:
         echo "::set-output name=image_version::${VERSION}"
         echo "::set-output name=image_sha::${SHORT_SHA}"
 
-    - name: Deploy to EC2
-      run: |
-        # Create deployment script with environment variables
-        cat > deploy.sh << 'EOF'
-        #!/bin/bash
-        cd /home/ec2-user
-        
-        # Cleanup old containers and images
-        echo "Cleaning up old containers and images..."
-        docker stop bagisto 2>/dev/null || true
-        docker rm bagisto 2>/dev/null || true
-        docker rmi $(docker images | grep bagisto | awk '{print $3}') 2>/dev/null || true
-        
-        # Pull and run new image
-        echo "Deploying new image..."
-        ./setup_bagisto.sh
-        
-        # Check container status
-        echo "Checking container status..."
-        docker ps | grep bagisto
-        EOF
-        
-        # Run deployment script on EC2 using instance ID
-        aws ssm send-command \
-          --document-name "AWS-RunShellScript" \
-          --targets "Key=instanceids,Values=$EC2_INSTANCE_ID" \
-          --parameters "commands=[$(cat deploy.sh | base64 -w 0)]" \
-          --comment "Deploy Bagisto $ENVIRONMENT image" \
-          --region ${{ secrets.AWS_REGION }}
-        
-        # Wait for command to complete and check status
-        sleep 10
-        COMMAND_ID=$(aws ssm list-commands --filters "Key=Status,Values=InProgress,Success" | jq -r '.Commands[0].CommandId')
-        if [ ! -z "$COMMAND_ID" ]; then
-          aws ssm get-command-invocation \
-            --command-id $COMMAND_ID \
-            --instance-id $EC2_INSTANCE_ID \
-            --region ${{ secrets.AWS_REGION }}
-        fi
-
     - name: Notify on Success
       if: success()
       uses: actions/github-script@v6
@@ -134,7 +86,7 @@ jobs:
           const { repo, owner } = context.repo;
           const run_id = context.runId;
           const run_url = `https://github.com/${owner}/${repo}/actions/runs/${run_id}`;
-          const message = `✅ Build and deployment succeeded!\nEnvironment: \`${process.env.ENVIRONMENT}\`\nImage Tags:\n- Version: \`${{ steps.build-image.outputs.image_version }}\`\n- SHA: \`${{ steps.build-image.outputs.image_sha }}\`\n- Latest: \`latest\`\nCommit Message: \`${{ steps.meta.outputs.commit_msg }}\`\nWorkflow: ${run_url}`;
+          const message = `✅ Build and push to ECR succeeded!\nImage Tags:\n- Version: \`${{ steps.build-image.outputs.image_version }}\`\n- SHA: \`${{ steps.build-image.outputs.image_sha }}\`\n- Latest: \`latest\`\nWorkflow: ${run_url}`;
           if (context.issue.number) {
             github.rest.issues.createComment({
               owner,
@@ -152,7 +104,7 @@ jobs:
           const { repo, owner } = context.repo;
           const run_id = context.runId;
           const run_url = `https://github.com/${owner}/${repo}/actions/runs/${run_id}`;
-          const message = `❌ Build or deployment failed!\nEnvironment: \`${process.env.ENVIRONMENT}\`\nCommit: \`${{ steps.meta.outputs.short_sha }}\`\nCommit Message: \`${{ steps.meta.outputs.commit_msg }}\`\nSee workflow run for details: ${run_url}`;
+          const message = `❌ Build or push to ECR failed!\nSee workflow run for details: ${run_url}`;
           if (context.issue.number) {
             github.rest.issues.createComment({
               owner,
