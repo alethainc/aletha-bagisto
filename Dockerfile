@@ -49,9 +49,11 @@ RUN mkdir -p storage/app/public/{theme,product,category,cache} \
     && mkdir -p storage/framework/{cache,sessions,views} \
     && mkdir -p storage/logs \
     && mkdir -p bootstrap/cache \
+    && php artisan storage:link \
     && chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type f -exec chmod 664 {} \; \
-    && find /var/www/html -type d -exec chmod 775 {} \;
+    && find /var/www/html -type d -exec chmod 775 {} \; \
+    && chmod -R 775 storage bootstrap/cache
 
 # Install dependencies
 RUN composer require league/flysystem-aws-s3-v3:"^3.0" --with-all-dependencies && \
