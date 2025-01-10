@@ -44,22 +44,24 @@ WORKDIR /var/www/html
 # Copy application code
 COPY . /var/www/html
 
-# Create storage structure and set permissions
+# Create storage structure
 RUN mkdir -p storage/app/public/{theme,product,category,cache} \
     && mkdir -p storage/framework/{cache,sessions,views} \
     && mkdir -p storage/logs \
-    && mkdir -p bootstrap/cache \
-    && php artisan storage:link \
-    && chown -R www-data:www-data /var/www/html \
-    && find /var/www/html -type f -exec chmod 664 {} \; \
-    && find /var/www/html -type d -exec chmod 775 {} \; \
-    && chmod -R 775 storage bootstrap/cache
+    && mkdir -p bootstrap/cache
 
-# Install dependencies
+# Install dependencies first
 RUN composer require league/flysystem-aws-s3-v3:"^3.0" --with-all-dependencies && \
     composer require bagisto/graphql-api && \
     composer require mll-lab/laravel-graphql-playground && \
     composer install --no-dev --optimize-autoloader
+
+# Now create storage link and set permissions
+RUN php artisan storage:link && \
+    chown -R www-data:www-data /var/www/html && \
+    find /var/www/html -type f -exec chmod 664 {} \; && \
+    find /var/www/html -type d -exec chmod 775 {} \; && \
+    chmod -R 775 storage bootstrap/cache
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
