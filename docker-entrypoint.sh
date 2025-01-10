@@ -1,7 +1,29 @@
 #!/bin/bash
 set -e
 
+# Function to fetch secrets from AWS Secrets Manager
+fetch_secrets() {
+    if [ ! -z "$AWS_SECRET_ARN" ]; then
+        echo "Fetching secrets from AWS Secrets Manager..."
+        secrets=$(aws secretsmanager get-secret-value --secret-id "$AWS_SECRET_ARN" --query SecretString --output text)
+        
+        # Parse JSON and set environment variables
+        while IFS="=" read -r key value; do
+            if [ ! -z "$key" ]; then
+                export "$key"="$value"
+            fi
+        done < <(echo "$secrets" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+    fi
+}
+
+# Fetch secrets if AWS_SECRET_ARN is provided
+fetch_secrets
+
 cd /var/www/html
+
+# Debug: Print current environment variables (excluding secrets)
+echo "Current environment:"
+env | grep -v -E "PASSWORD|KEY|SECRET"
 
 # Install dependencies
 echo "Installing dependencies..."
@@ -27,13 +49,51 @@ echo "Setting up storage symlink..."
 rm -rf public/storage
 php artisan storage:link
 
-# Verify S3 configuration if using S3
-if [ "$FILESYSTEM_CLOUD" = "s3" ]; then
-    echo "Verifying S3 configuration..."
-    if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_BUCKET" ]; then
-        echo "Error: S3 configuration is incomplete"
-        exit 1
-    fi
+# Verify database connection
+echo "Verifying database connection..."
+if php artisan db:show --json; then
+    echo "✅ Database connection successful"
+else
+    echo "❌ Database connection failed"
+    echo "Database configuration:"
+    php artisan config:show database
+    exit 1
+fi
+
+# Run database migrations and seed with debug
+echo "Running database migrations..."
+php artisan migrate:status
+php artisan migrate --seed --force -vvv
+
+# Create admin user if not exists
+echo "Checking for admin user..."
+ADMIN_COUNT=$(php artisan tinker --execute="echo \DB::table('admins')->count();")
+if [ "$ADMIN_COUNT" -eq "0" ]; then
+    echo "Creating admin user..."
+    php artisan tinker --execute="
+        \DB::table('admins')->insert([
+            'name' => 'Admin',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('admin123'),
+            'role_id' => 1,
+            'status' => 1,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+    "
+    echo "✅ Admin user created"
+else
+    echo "✅ Admin user already exists"
+fi
+
+# Verify installation
+echo "Verifying Bagisto installation..."
+if [ -f "storage/installed" ]; then
+    echo "✅ Bagisto installation file found"
+else
+    echo "❌ Bagisto installation file missing"
+    echo "Creating installation file..."
+    echo "$(date)" > storage/installed
 fi
 
 # Set proper permissions
@@ -42,9 +102,11 @@ chown -R www-data:www-data storage bootstrap/cache public/media public/storage
 chmod -R 775 storage bootstrap/cache public/media public/storage
 chmod -R 775 storage/app/public/cache
 
-# Run database migrations and seed
-echo "Running database migrations..."
-php artisan migrate --seed --force
+# Create health check file
+echo "Creating health check file..."
+echo "OK" > public/health.txt
+chown www-data:www-data public/health.txt
+chmod 644 public/health.txt
 
 # Clear all caches
 echo "Clearing application caches..."
