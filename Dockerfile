@@ -45,8 +45,13 @@ WORKDIR /var/www/html
 COPY . /var/www/html
 
 # Create storage structure
-RUN mkdir -p storage/app/public/{theme,product,category,cache} \
-    && mkdir -p storage/framework/{cache,sessions,views} \
+RUN mkdir -p storage/app/public/theme \
+    && mkdir -p storage/app/public/product \
+    && mkdir -p storage/app/public/category \
+    && mkdir -p storage/app/public/cache \
+    && mkdir -p storage/framework/cache \
+    && mkdir -p storage/framework/sessions \
+    && mkdir -p storage/framework/views \
     && mkdir -p storage/logs \
     && mkdir -p bootstrap/cache
 
