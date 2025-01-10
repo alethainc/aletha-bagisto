@@ -1,5 +1,5 @@
 # main image
-FROM php:8.3-apache
+FROM --platform=linux/amd64 php:8.3-apache
 
 # installing dependencies
 RUN apt-get update && apt-get install -y \
@@ -44,8 +44,12 @@ WORKDIR /var/www/html
 # Copy application code
 COPY . /var/www/html
 
-# Set permissions for application files
-RUN chown -R www-data:www-data /var/www/html \
+# Create storage structure and set permissions
+RUN mkdir -p storage/app/public/{theme,product,category,cache} \
+    && mkdir -p storage/framework/{cache,sessions,views} \
+    && mkdir -p storage/logs \
+    && mkdir -p bootstrap/cache \
+    && chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type f -exec chmod 664 {} \; \
     && find /var/www/html -type d -exec chmod 775 {} \;
 
